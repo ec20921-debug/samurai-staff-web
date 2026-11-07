@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex, nofollow">
+<title>スタッフ名鑑 | SAMURAI MOTORS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=Noto+Sans+JP:wght@400;500;700&family=Noto+Sans+Khmer:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css?v=20261107b">
+</head>
+<body>
+
+<!-- ログイン（日本メンバーも現場スタッフも同じ入口。入ったあと画面が分かれる） -->
+<div id="login" class="login" hidden>
+  <div class="login-card">
+    <img src="assets/logo-full.jpg" alt="SAMURAI MOTORS" class="login-logo">
+    <h1 class="login-title">スタッフ名鑑</h1>
+    <p class="login-sub">Staff Portal</p>
+    <div id="loginLang"></div>
+    <form id="loginForm" autocomplete="on">
+      <label class="field"><span id="lblId">Login ID</span><input id="loginId" autocomplete="username" autocapitalize="none" required></label>
+      <label class="field"><span id="lblPw">Password</span><input id="loginPw" type="password" autocomplete="current-password" required></label>
+      <p id="loginErr" class="login-err" hidden></p>
+      <button class="btn btn-gold btn-block" type="submit" id="loginSubmit">Sign in</button>
+    </form>
+    <div id="loginDemo" class="login-demo" hidden>
+      <button class="btn btn-block btn-dark" data-demo="admin">日本メンバーとして試す（デモ）</button>
+      <button class="btn btn-block btn-dark" data-demo="staff">現場スタッフとして試す（デモ）</button>
+    </div>
+    <p class="login-note" id="loginNote"></p>
+  </div>
+</div>
+
+<!-- 現場スタッフ用（休暇申請だけ） -->
+<div id="staffApp" class="staff-app" hidden></div>
+
+<!-- 日本メンバー用（名鑑） -->
+<div id="app" class="app" hidden>
+  <aside class="side">
+    <a href="#/home" class="brand">
+      <img src="assets/logo-mark.jpg" alt="" class="brand-mark">
+      <span class="brand-text">
+        <span class="brand-name">SAMURAI MOTORS</span>
+        <span class="brand-sub">スタッフ名鑑</span>
+      </span>
+    </a>
+    <div class="biz">
+      <label for="bizSel">事業</label>
+      <select id="bizSel">
+        <option value="motors" selected>Samurai Motors</option>
+        <option value="language" disabled>Samurai Language（準備中）</option>
+      </select>
+    </div>
+    <nav class="nav" id="nav">
+      <a href="#/home" data-nav="home"><span class="ico">◆</span>ホーム</a>
+      <a href="#/staff" data-nav="staff"><span class="ico">◉</span>スタッフ一覧</a>
+      <a href="#/leaves" data-nav="leaves"><span class="ico">✉</span>休暇申請<span id="leaveBadge" class="nav-badge" hidden></span></a>
+      <a href="#/birthdays" data-nav="birthdays"><span class="ico">✦</span>誕生日カレンダー</a>
+      <a href="#/settings" data-nav="settings"><span class="ico">⚙</span>データと設定</a>
+    </nav>
+    <div class="side-foot">
+      <span class="whoami" id="whoami"></span>
+      <button id="logoutBtn" class="link-btn">ログアウト</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div id="view"></div>
+  </main>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<!-- 改ざん防止: 中身が1バイトでも違えば読み込まない（integrity） -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+<script src="config.js?v=20261107b"></script>
+<script src="sample-data.js?v=20261107b"></script>
+<script src="store.js?v=20261107b"></script>
+<script src="staff.js?v=20261107b"></script>
+<script src="app.js?v=20261107b"></script>
+</body>
+</html>
