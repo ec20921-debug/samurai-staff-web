@@ -59,7 +59,7 @@
       if (error) { const e = new Error('IDかパスワードが違います'); e.code = 'BAD_LOGIN'; throw e; }
       return Store._loadMe();
     },
-    async demoSignIn(role) { const me = role === 'staff' ? DEMO_STAFF_ME : DEMO_ADMIN_ME; ssSet(LS.me, me); return me; },
+    async demoSignIn(role) { if (cloud) fail('本番ではデモで入れません'); const me = role === 'staff' ? DEMO_STAFF_ME : DEMO_ADMIN_ME; ssSet(LS.me, me); return me; },
     async signOut() { if (cloud) await sb.auth.signOut(); ssSet(LS.me, null); },
 
     // ---------- スタッフ（名鑑）: 管理者だけ ----------

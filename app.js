@@ -48,11 +48,33 @@
   }
   // 次の誕生日までの日数（今日なら 0）
   function daysToBirthday(birthday) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(birthday || '')) return null; // 年月日がそろっているときだけ
     const b = parseYMD(birthday); if (!b) return null;
     const t = todayYMD();
     let next = new Date(t.getFullYear(), b.getMonth(), b.getDate());
     if (next < t) next = new Date(t.getFullYear() + 1, b.getMonth(), b.getDate());
     return Math.round((next - t) / 86400000);
+  }
+  // 年齢の表示（年だけ分かっているときは「約」をつける）
+  function ageText(bd) {
+    if (/^\d{4}$/.test(bd || '')) return `約${todayYMD().getFullYear() - +bd}歳`;
+    const a = age(bd); return a == null ? '年齢未確認' : `${a}歳`;
+  }
+  function bdText(bd) {
+    if (/^\d{4}$/.test(bd || '')) return `${bd}年生まれ`;
+    if (/^\d{4}-\d{2}$/.test(bd || '')) return `${bd.slice(0, 4)}年${+bd.slice(5)}月生まれ`;
+    return bd ? fmtDate(bd) : '誕生日未確認';
+  }
+  // スタッフ本人と家族の誕生日を1つの一覧にする（年月日がそろっている人だけ）
+  function birthdayEvents(people) {
+    const ev = [];
+    people.forEach((p) => {
+      if (daysToBirthday(p.birthday) != null) ev.push({ p, who: '', bd: p.birthday, likes: p.likes });
+      (p.familyMembers || []).forEach((f) => {
+        if (daysToBirthday(f.birthday) != null) ev.push({ p, who: `の${f.relation || '家族'}${f.name ? `（${f.name}）` : ''}`, bd: f.birthday, likes: f.note });
+      });
+    });
+    return ev;
   }
   // 勤続（◯年◯か月）
   function tenure(joinDate) {
@@ -113,9 +135,11 @@
   function viewHome() {
     const act = active();
     const t = todayYMD();
-    const thisMonth = act.filter((p) => { const b = parseYMD(p.birthday); return b && b.getMonth() === t.getMonth(); });
-    const upcoming = act.filter((p) => p.birthday).map((p) => ({ p, d: daysToBirthday(p.birthday) }))
-      .sort((a, b) => a.d - b.d).slice(0, 5);
+    // 本人と家族の誕生日をまとめて並べる
+    const events = birthdayEvents(act).map((e) => ({ ...e, d: daysToBirthday(e.bd) }));
+    const evName = (e) => esc(e.p.nickname || e.p.nameEn) + esc(e.who);
+    const thisMonth = events.filter((e) => parseYMD(e.bd).getMonth() === t.getMonth());
+    const upcoming = [...events].sort((a, b) => a.d - b.d).slice(0, 6);
     const todays = upcoming.filter((x) => x.d === 0);
     const avgM = act.length ? Math.round(act.reduce((s, p) => s + tenureMonths(p.joinDate), 0) / act.length) : 0;
     const qualCount = act.reduce((s, p) => s + (p.qualifications || []).length, 0);
@@ -136,16 +160,16 @@
         <a class="btn btn-gold" href="#/edit/new">＋ スタッフを登録</a>
       </div>
 
-      ${todays.map(({ p }) => `
+      ${todays.map((e) => { const p = e.p; return `
         <a class="today-bd" href="#/staff/${esc(p.id)}" style="text-decoration:none">
           ${avatar(p, 'av-40')}
-          <div><b>🎂 今日は ${esc(p.nickname || p.nameEn)} さんの誕生日です（${age(p.birthday)}歳）</b>
-          <div class="lr-sub">好きなもの: ${esc(p.likes || '未登録')}</div></div>
-        </a>`).join('')}
+          <div><b>🎂 今日は ${evName(e)} の誕生日です（${age(e.bd)}歳）</b>
+          <div class="lr-sub">${e.who ? 'メモ' : '好きなもの'}: ${esc(e.likes || '未登録')}</div></div>
+        </a>`; }).join('')}
 
       <div class="stats">
         <div class="card stat"><div class="stat-label">在籍スタッフ</div><div class="stat-value">${act.length}<small>人</small></div><div class="stat-note">目標: 1年後に10人</div></div>
-        <div class="card stat"><div class="stat-label">今月の誕生日</div><div class="stat-value">${thisMonth.length}<small>人</small></div><div class="stat-note">${thisMonth.map((p) => esc(p.nickname || p.nameEn)).join('・') || 'なし'}</div></div>
+        <div class="card stat"><div class="stat-label">今月の誕生日</div><div class="stat-value">${thisMonth.length}<small>人</small></div><div class="stat-note">${thisMonth.map(evName).join('・') || 'なし'}（家族も含む）</div></div>
         <div class="card stat"><div class="stat-label">平均勤続</div><div class="stat-value">${Math.floor(avgM / 12) ? Math.floor(avgM / 12) + '<small>年</small>' : ''}${avgM % 12}<small>か月</small></div><div class="stat-note">在籍者の平均</div></div>
         <div class="card stat"><div class="stat-label">資格・修了証</div><div class="stat-value">${qualCount}<small>件</small></div><div class="stat-note">在籍者の合計</div></div>
       </div>
@@ -154,13 +178,13 @@
         <div class="stack">
           <section class="card card-pad">
             <h2 class="card-title"><span class="mark"></span>次の誕生日</h2>
-            ${upcoming.length ? upcoming.map(({ p, d }) => `
+            ${upcoming.length ? upcoming.map((e) => { const p = e.p, d = e.d; return `
               <a class="list-row" href="#/staff/${esc(p.id)}">
                 ${avatar(p, 'av-40')}
-                <div class="lr-body"><div class="lr-name">${esc(p.nickname || p.nameEn)} <span style="font-weight:400;color:var(--ink-3);font-size:12px">${esc(p.nameEn)}</span></div>
-                <div class="lr-sub">🎁 好きなもの: ${esc(p.likes || '未登録')}</div></div>
-                <div class="lr-right"><div class="countdown">${d === 0 ? '今日' : 'あと' + d + '日'}</div>${fmtDate(p.birthday).replace(/^\d+年/, '')}・${age(p.birthday) + (d === 0 ? 0 : 1)}歳に</div>
-              </a>`).join('') : '<p class="empty">誕生日が登録されたスタッフがいません。</p>'}
+                <div class="lr-body"><div class="lr-name">${evName(e)}</div>
+                <div class="lr-sub">🎁 ${e.who ? 'メモ' : '好きなもの'}: ${esc(e.likes || '未登録')}</div></div>
+                <div class="lr-right"><div class="countdown">${d === 0 ? '今日' : 'あと' + d + '日'}</div>${fmtDate(e.bd).replace(/^\d+年/, '')}・${age(e.bd) + (d === 0 ? 0 : 1)}歳に</div>
+              </a>`; }).join('') : '<p class="empty">誕生日が登録されたスタッフがいません。</p>'}
           </section>
           <section class="card card-pad">
             <h2 class="card-title"><span class="mark"></span>最近の研修・教育</h2>
@@ -460,7 +484,7 @@
             <dt>英語表記</dt><dd>${esc(p.nameEn)}</dd>
             <dt>生年月日</dt><dd>${fmtDate(p.birthday)}（${age(p.birthday) ?? '—'}歳）</dd>
             <dt>出身地</dt><dd><b>${esc(p.birthplace || '—')}</b>${p.hometown ? ` ・ ${esc(p.hometown)}` : ''}</dd>
-            <dt>家族構成</dt><dd>${esc(p.family || '—')}</dd>
+            <dt>家族のメモ</dt><dd>${esc(p.family || '—')}</dd>
             <dt>性別</dt><dd>${esc(p.gender || '—')}</dd>
           </dl></section>
         <section class="card card-pad"><h2 class="card-title"><span class="mark"></span>仕事のこと</h2>
@@ -484,7 +508,15 @@
             <div class="dots">${[1, 2, 3].map((i) => `<i class="${i <= lv ? 'on' : ''}"></i>`).join('')}</div>
             <span class="lv">${LANG_LV[lv]}</span></div>`; }).join('')}
         </section>
-      </div>`;
+      </div>
+      <section class="card card-pad" style="margin-top:16px"><h2 class="card-title"><span class="mark"></span>家族</h2>
+        ${(p.familyMembers || []).length ? `<div class="fam-list">${p.familyMembers.map((f) => { const fd = daysToBirthday(f.birthday); return `
+          <div class="fam-item">
+            <span class="chip chip-gold">${esc(f.relation || '家族')}</span>
+            <div class="fam-body"><b>${esc(f.name || '名前未確認')}</b> ・ ${esc(ageText(f.birthday))}
+              <div class="lr-sub">${esc(bdText(f.birthday))}${fd != null && fd <= 60 ? ` ・ 誕生日まであと${fd}日` : ''}${f.note ? ` ・ ${esc(f.note)}` : ''}</div></div>
+          </div>`; }).join('')}</div>` : '<p class="empty">まだ登録がありません。「編集」から、奥さん・子ども・両親などを1人ずつ足せます。</p>'}
+      </section>`;
 
     const learn = `
       <div class="two-col">
@@ -627,8 +659,27 @@
   const opts = (list, val, empty) => (empty ? `<option value="">${empty}</option>` : '') + list.map((o) => `<option ${o === val ? 'selected' : ''}>${esc(o)}</option>`).join('');
   const inp = (key, label, val, type = 'text', extra = '') => `<label class="field ${extra}"><span>${label}</span><input data-k="${key}" type="${type}" value="${esc(val || '')}"></label>`;
 
+  // 生年月日を「年・月・日」の3つの選択肢で選ぶ（カレンダーを何十年も戻らなくていいように）
+  // 年だけ・年月だけでも保存できる（家族の年齢だけ分かっている場合など）。誕生日の通知は年月日がそろったときだけ
+  const pad2 = (n) => String(n).padStart(2, '0');
+  function bdPick(attrs, val, minYear) {
+    const m = /^(\d{4})(?:-(\d{2}))?(?:-(\d{2}))?$/.exec(val || '');
+    const y = m ? +m[1] : '', mo = m && m[2] ? +m[2] : '', d = m && m[3] ? +m[3] : '';
+    const now = new Date().getFullYear(); const years = []; for (let i = now; i >= minYear; i--) years.push(i);
+    const sel = (part, list, cur, label, unit) => `<select ${attrs} data-part="${part}" aria-label="${label}"><option value="">${label}</option>${list.map((v) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${v}${unit}</option>`).join('')}</select>`;
+    return `<span class="bd-pick">${sel('y', years, y, '年', '年')}${sel('m', Array.from({ length: 12 }, (_, i) => i + 1), mo, '月', '月')}${sel('d', Array.from({ length: 31 }, (_, i) => i + 1), d, '日', '日')}</span>`;
+  }
+  function bdValue(box) {
+    const [y, m, d] = ['y', 'm', 'd'].map((p) => box.querySelector(`[data-part="${p}"]`).value);
+    if (!y) return '';
+    if (!m) return y;
+    return d ? `${y}-${pad2(m)}-${pad2(d)}` : `${y}-${pad2(m)}`;
+  }
+  const RELATIONS = ['妻', '夫', '息子', '娘', '父', '母', '兄弟姉妹', '祖父母', 'その他'];
+
   // 繰り返し行（学歴・資格・研修・プレゼント・メモ）の定義
   const REPEATS = {
+    familyMembers: { cls: 're-family', head: ['続柄', '名前', '生年月日（年だけでも可）', 'メモ（学校・仕事・好きなもの）'], cols: [['relation', 'select', ['', ...RELATIONS]], ['name', 'text', '名前'], ['birthday', 'bd', ''], ['note', 'text', '例: 小学2年・サッカーが好き']], blank: { relation: '', name: '', birthday: '', note: '' } },
     education: { cls: 're-edu', head: ['期間', '学校名', '備考'], cols: [['period', 'text', '2016–2019'], ['school', 'text', '学校名'], ['note', 'text', '卒業・中退など']], blank: { period: '', school: '', note: '' } },
     qualifications: { cls: 're-qual', head: ['資格・免許・修了証', '取得年月', '備考'], cols: [['name', 'text', '例: 運転免許'], ['date', 'month', ''], ['note', 'text', '']], blank: { name: '', date: '', note: '' } },
     trainings: { cls: 're-train', head: ['日付', '内容', '教えた人', '結果'], cols: [['date', 'date', ''], ['title', 'text', '例: GLASS 施工'], ['by', 'text', ''], ['result', 'select', ['', '受講', '合格', '要再研修']]], blank: { date: '', title: '', by: '', result: '受講' } },
@@ -644,6 +695,7 @@
       ${rows.map((r, i) => `<div class="row-edit ${def.cls}">
         ${def.cols.map(([c, type, ph]) => type === 'select'
           ? `<select data-r="${key}" data-i="${i}" data-c="${c}">${ph.map((o) => `<option value="${esc(o)}" ${r[c] === o ? 'selected' : ''}>${esc(o || '—')}</option>`).join('')}</select>`
+          : type === 'bd' ? bdPick(`data-r="${key}" data-i="${i}" data-c="${c}"`, r[c], 1930)
           : `<input data-r="${key}" data-i="${i}" data-c="${c}" type="${type}" placeholder="${esc(ph)}" value="${esc(r[c] || '')}">`).join('')}
         <button type="button" class="x" data-del="${key}" data-i="${i}" title="この行を消す">×</button></div>`).join('')}
       <button type="button" class="btn btn-sm" data-add="${key}">＋ 行を追加</button>`;
@@ -680,13 +732,18 @@
 
         <section class="card card-pad form-sec"><h2 class="card-title"><span class="mark"></span>本人のこと</h2>
           <div class="form-grid">
-            ${inp('birthday', '生年月日', p.birthday, 'date')}
+            <div class="field"><span>生年月日</span>${bdPick('data-k="birthday"', p.birthday, 1950)}</div>
             <label class="field"><span>出身地（州）</span><select data-k="birthplace">${opts(PROVINCES, p.birthplace, '—')}</select></label>
             ${inp('hometown', '出身の町・村', p.hometown)}
             <label class="field"><span>性別</span><select data-k="gender">${opts(GENDERS, p.gender, '—')}</select></label>
-            ${inp('family', '家族構成（例: 両親・妹2人、妻と子1人）', p.family, 'text', 'span2')}
+            ${inp('family', '家族のメモ（例: 両親は村で農業・妹2人）', p.family, 'text', 'span2')}
             ${inp('likes', '好きなもの・趣味（誕生日プレゼントの参考）', p.likes, 'text', 'span3')}
           </div>
+        </section>
+
+        <section class="card card-pad form-sec"><h2 class="card-title"><span class="mark"></span>家族（奥さん・子ども・両親など）</h2>
+          <p class="page-sub" style="margin:-6px 0 10px">誕生日が分かれば、ホームと誕生日カレンダーに出ます。年齢だけ分かるときは「年」だけ選んでください。</p>
+          ${repeatBlock('familyMembers')}
         </section>
 
         <section class="card card-pad form-sec"><h2 class="card-title"><span class="mark"></span>仕事のこと</h2>
@@ -761,10 +818,11 @@
       const el = e.target;
       if (el.dataset.k) {
         const k = el.dataset.k;
+        if (el.dataset.part) { draft[k] = bdValue(el.closest('.bd-pick')); return; }
         if (k.startsWith('em.')) { draft.emergency = draft.emergency || {}; draft.emergency[k.slice(3)] = el.value; }
         else draft[k] = el.value;
       } else if (el.dataset.r) {
-        draft[el.dataset.r][+el.dataset.i][el.dataset.c] = el.value;
+        draft[el.dataset.r][+el.dataset.i][el.dataset.c] = el.dataset.part ? bdValue(el.closest('.bd-pick')) : el.value;
       } else if (el.dataset.lang) {
         draft.languages = draft.languages || {}; draft.languages[el.dataset.lang] = +el.value;
       } else if (el.dataset.skill) {
@@ -802,6 +860,13 @@
       clean.careerBefore = (clean.careerBefore || []).filter((r) => r.company || r.duty);
       clean.careerAfter = (clean.careerAfter || []).filter((r) => r.role || r.duty);
       clean.dreams = (clean.dreams || []).filter((r) => r.text);
+      clean.familyMembers = (clean.familyMembers || []).filter((r) => r.relation || r.name || r.birthday || r.note);
+      // 2月30日のような、ない日付は止める
+      const badDate = [clean.birthday, ...clean.familyMembers.map((r) => r.birthday)].find((s) => {
+        const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); if (!m) return false;
+        const d = new Date(+m[1], +m[2] - 1, +m[3]); return d.getMonth() !== +m[2] - 1;
+      });
+      if (badDate) { alert(`${badDate} という日付はありません。日を選び直してください。`); return; }
       clean.notes = (clean.notes || []).filter((r) => r.text);
       const isNew = id === 'new';
       if (isNew && CLOUD) {
@@ -817,12 +882,12 @@
   function viewBirthdays() {
     const act = active(); const nowM = todayYMD().getMonth();
     return `
-      <div class="page-head"><div><h1 class="page-title">誕生日カレンダー</h1><p class="page-sub">在籍・休職中のスタッフ。プレゼントの準備に使ってください。</p></div></div>
+      <div class="page-head"><div><h1 class="page-title">誕生日カレンダー</h1><p class="page-sub">在籍・休職中のスタッフと、その家族（奥さん・子どもなど）。プレゼントの準備に使ってください。</p></div></div>
       <div class="months">${Array.from({ length: 12 }, (_, m) => {
-        const list = act.filter((p) => { const b = parseYMD(p.birthday); return b && b.getMonth() === m; })
-          .sort((a, b) => parseYMD(a.birthday).getDate() - parseYMD(b.birthday).getDate());
+        const list = birthdayEvents(act).filter((e) => parseYMD(e.bd).getMonth() === m)
+          .sort((a, b) => parseYMD(a.bd).getDate() - parseYMD(b.bd).getDate());
         return `<section class="card month ${m === nowM ? 'now' : ''}"><h3>${m + 1}月<span>${list.length ? list.length + '人' : ''}</span></h3>
-          ${list.map((p) => `<a class="bd-item" href="#/staff/${esc(p.id)}"><span class="d">${parseYMD(p.birthday).getDate()}日</span>${avatar(p, 'av-40')}<span>${esc(p.nickname || p.nameEn)}<br><span style="font-size:11.5px;color:var(--ink-3)">${age(p.birthday) + (daysToBirthday(p.birthday) === 0 ? 0 : 1)}歳に</span></span></a>`).join('') || '<p class="empty">—</p>'}
+          ${list.map((e) => `<a class="bd-item ${e.who ? 'is-family' : ''}" href="#/staff/${esc(e.p.id)}"><span class="d">${parseYMD(e.bd).getDate()}日</span>${avatar(e.p, 'av-40')}<span>${esc(e.p.nickname || e.p.nameEn)}${e.who ? `<span class="fam-tag">${esc(e.who)}</span>` : ''}<br><span style="font-size:11.5px;color:var(--ink-3)">${age(e.bd) + (daysToBirthday(e.bd) === 0 ? 0 : 1)}歳に</span></span></a>`).join('') || '<p class="empty">—</p>'}
         </section>`; }).join('')}</div>`;
   }
 
