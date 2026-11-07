@@ -317,6 +317,32 @@ dl.kv dt:first-of-type,dl.kv dd:first-of-type{border-top:0;}
 .s-note{margin-top:6px;font-size:12.5px;background:#fff;border-left:3px solid var(--accent);padding:6px 8px;}
 .s-req .btn{margin-top:8px;}
 
+/* ---------- 現場スタッフ画面のタブと「自分のこと」 ---------- */
+.s-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 12px;}
+.s-tabs button{border:1px solid var(--line-2);background:var(--surface);border-radius:10px;padding:10px;font-weight:700;cursor:pointer;font-size:14px;}
+.s-tabs button.on{background:var(--sm-card);color:var(--sm-gold-bright);border-color:#000;}
+.s-h3{font-size:14px;margin:18px 0 8px;padding-top:12px;border-top:1px solid var(--line);}
+.s-fam{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:var(--surface-2);}
+.s-fam .btn{margin-top:-4px;}
+.s-last{font-size:12.5px;color:var(--ink-2);background:var(--surface-2);border-radius:8px;padding:6px 10px;}
+.staff-wrap .bd-pick select{font-size:15px;}
+
+.s-loc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 12px;background:var(--surface-2);}
+.s-loc-t{display:block;font-size:12.5px;color:var(--ink-2);margin-bottom:6px;font-weight:700;}
+.s-loc-ok{font-size:13px;color:var(--ok);margin:0 0 8px;}
+/* 地図 */
+iframe.map{width:100%;height:220px;border:0;border-radius:10px;background:var(--muted-soft);}
+
+/* ---------- 自己申告の確認（管理者） ---------- */
+.sr-table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px;}
+.sr-table th,.sr-table td{border-top:1px solid var(--line);padding:8px;vertical-align:top;text-align:left;}
+.sr-table th{color:var(--ink-3);font-weight:500;width:150px;}
+.sr-table td.cur{color:var(--ink-3);}
+.sr-table td.new{font-weight:500;}
+.sr-table tr.same td.new{color:var(--ink-3);font-weight:400;}
+.sr-act{display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap;}
+.tr-link{font-size:11.5px;margin-left:6px;}
+
 /* ---------- トースト ---------- */
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--sm-card);color:var(--sm-gold-bright);
   padding:10px 18px;border-radius:10px;font-size:13.5px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:50;}

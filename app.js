@@ -117,9 +117,11 @@
   const CLOUD = window.Store.mode === 'cloud';
   // AI は人が増えてから入れる（2026-11-07 Daisuke）。本番では config.js の aiEnabled: true で出す。デモでは見た目を確かめられるよう出す
   const AI_ON = !CLOUD || !!(window.STAFF_APP_CONFIG || {}).aiEnabled;
+  let reports = []; // 自己申告（管理者は全員分）
   async function load() {
     staff = await Store.loadStaff();
     try { leaves = await Store.listLeave(); } catch (e) { leaves = []; }
+    try { reports = await Store.listSelfReports(); } catch (e) { reports = []; }
   }
   // 1人分を保存（本番は1行 upsert、デモは全員分を localStorage へ）
   // 保存に成功してから画面のデータを入れ替える（失敗したら何も変えない）
@@ -460,7 +462,98 @@
       } catch (e) { alert('更新できませんでした: ' + e.message); }
     }));
   }
-  function updateBadge() { const el = $('#leaveBadge'); if (el) { const n = pendingCount(); el.textContent = n; el.hidden = !n; } }
+  function updateBadge() {
+    const el = $('#leaveBadge'); if (el) { const n = pendingCount(); el.textContent = n; el.hidden = !n; }
+    const sr = $('#srBadge'); if (sr) { const n = reports.filter((r) => r.status === 'pending').length; sr.textContent = n; sr.hidden = !n; }
+  }
+
+  // ---------- 画面: 自己申告（本人が送った「自分のこと」を確認して名鑑へ） ----------
+  const REL_JA = { wife: '妻', husband: '夫', son: '息子', daughter: '娘', father: '父', mother: '母', brother_older: '兄', sister_older: '姉', brother_younger: '弟', sister_younger: '妹', sibling: '兄弟姉妹', grand: '祖父母', other: 'その他' };
+  const SR_FIELDS = [
+    ['nameKm', 'クメール語の名前'], ['nameEn', '英語の名前'], ['birthday', '生年月日'], ['birthplace', '生まれた州'], ['hometown', '村・区・郡'],
+    ['phone', '電話'], ['homeLoc', '今の住まい（地図）'], ['villageLoc', '実家（地図）'], ['family', '家族'], ['emergency', '緊急連絡先'], ['likes', '好きなもの'], ['dream', '夢・これから'], ['school', '通った学校'], ['jobs', '前の仕事']
+  ];
+  const famText = (list) => (list || []).map((f) => `${REL_JA[f.relation] || f.relation || '家族'}${f.name ? ' ' + f.name : ''}${f.birthday ? '（' + bdText(f.birthday) + '）' : ''}${f.note ? '・' + f.note : ''}`).join('、');
+  function srCurrent(p, key) {
+    if (!p) return '';
+    if (key === 'family') return famText((p.familyMembers || []).map((f) => ({ ...f, relation: Object.keys(REL_JA).find((k) => REL_JA[k] === f.relation) || f.relation })));
+    if (key === 'emergency') return p.emergency && p.emergency.name ? `${p.emergency.name}（${p.emergency.relation || ''}）${p.emergency.phone || ''}` : '';
+    if (key === 'dream') return ((p.dreams || []).slice(-1)[0] || {}).text || '';
+    if (key === 'school') return (p.education || []).map((e) => e.school).join('、');
+    if (key === 'jobs') return (p.careerBefore || []).map((c) => c.company).join('、');
+    if (key === 'birthday') return p.birthday ? bdText(p.birthday) : '';
+    if (key === 'homeLoc') return locInput(p.homeLocation);
+    if (key === 'villageLoc') return locInput(p.villageLocation);
+    return p[key] || '';
+  }
+  function srNew(d, key) {
+    if (key === 'family') return famText(d.family);
+    if (key === 'emergency') return d.emergency && (d.emergency.name || d.emergency.phone) ? `${d.emergency.name || ''}（${d.emergency.relation || ''}）${d.emergency.phone || ''}` : '';
+    if (key === 'birthday') return d.birthday ? bdText(d.birthday) : '';
+    if (key === 'homeLoc' || key === 'villageLoc') return locInput(d[key]);
+    return d[key] || '';
+  }
+  let srFilter = 'pending';
+  function viewReports() {
+    const rows = reports.filter((r) => srFilter === 'all' || r.status === srFilter);
+    const st = { pending: ['確認待ち', 'badge-warn'], applied: ['反映済み', 'badge-ok'], dismissed: ['見送り', 'badge-mute'] };
+    return `
+      <div class="page-head"><div><h1 class="page-title">自己申告</h1><p class="page-sub">現場スタッフが自分の画面の「自分のこと」から送った内容です。名鑑に入れる項目を選んで「反映」してください。クメール語で書かれていることがあります。</p></div></div>
+      <div class="toolbar"><div class="seg">${[['pending', `確認待ち（${reports.filter((r) => r.status === 'pending').length}）`], ['applied', '反映済み'], ['dismissed', '見送り'], ['all', 'すべて']].map(([k, l]) => `<button data-srf="${k}" class="${srFilter === k ? 'on' : ''}">${l}</button>`).join('')}</div></div>
+      ${rows.length ? `<div class="stack">${rows.map((r) => { const p = byId(r.staff_id); const d = r.data || {}; return `
+        <section class="card card-pad">
+          <div class="leave-who">${p ? avatar(p, 'av-40') : ''}<div><b>${esc(p ? (p.nickname || p.nameEn) : r.staff_id)}</b> <span class="badge ${st[r.status][1]}">${st[r.status][0]}</span><div class="lr-sub">${fmtDate(String(r.created_at).slice(0, 10))} に送信</div></div></div>
+          <table class="sr-table"><thead><tr><th>項目</th><th>名鑑の今</th><th>申告の内容</th><th>${r.status === 'pending' ? '反映' : ''}</th></tr></thead><tbody>
+          ${SR_FIELDS.map(([k, label]) => { const nv = srNew(d, k); if (!nv) return ''; const cv = srCurrent(p, k); const same = cv === nv; return `
+            <tr class="${same ? 'same' : ''}"><th>${label}</th><td class="cur">${esc(cv || '—')}</td><td class="new ${['nameKm'].includes(k) ? 'km' : ''}">${esc(nv)}</td>
+            <td>${r.status === 'pending' ? `<input type="checkbox" data-sr="${esc(r.id)}" data-key="${k}" ${same ? '' : 'checked'}>` : ''}</td></tr>`; }).join('')}
+          </tbody></table>
+          ${r.status === 'pending' ? `<div class="sr-act"><button class="btn" data-srd="${esc(r.id)}">見送る</button><button class="btn btn-gold" data-sra="${esc(r.id)}">選んだ項目を名鑑に反映</button></div>` : ''}
+        </section>`; }).join('')}</div>` : '<div class="card card-pad empty">該当する申告はありません。</div>'}`;
+  }
+  // 申告を名鑑のカルテに入れる（家族は、名前も誕生日も空の「同じ続柄」の行があればそこを埋め、なければ足す）
+  function applyReport(p, d, keys) {
+    const n = JSON.parse(JSON.stringify(p)); const today = ymdStr(todayYMD());
+    keys.forEach((k) => {
+      if (['nameKm', 'nameEn', 'birthday', 'birthplace', 'hometown', 'phone', 'likes'].includes(k)) n[k] = d[k];
+      else if (k === 'homeLoc') n.homeLocation = safeLoc(d.homeLoc);
+      else if (k === 'villageLoc') n.villageLocation = safeLoc(d.villageLoc);
+      else if (k === 'emergency') n.emergency = { name: d.emergency.name || '', relation: d.emergency.relation || '', phone: d.emergency.phone || '' };
+      else if (k === 'dream') { n.dreams = n.dreams || []; n.dreams.push({ date: today, text: d.dream }); }
+      else if (k === 'school') { n.education = n.education || []; n.education.push({ period: '', school: d.school, note: '本人の申告' }); }
+      else if (k === 'jobs') { n.careerBefore = n.careerBefore || []; n.careerBefore.push({ period: '', company: d.jobs, duty: '本人の申告' }); }
+      else if (k === 'family') {
+        n.familyMembers = n.familyMembers || [];
+        (d.family || []).forEach((f) => {
+          const rel = REL_JA[f.relation] || 'その他';
+          const slot = n.familyMembers.find((m) => m.relation === rel && !m.name && !m.birthday);
+          if (slot) { slot.name = f.name || ''; slot.birthday = f.birthday || ''; slot.note = [slot.note, f.note, '本人の申告'].filter(Boolean).join('・'); }
+          else n.familyMembers.push({ relation: rel, name: f.name || '', birthday: f.birthday || '', note: [f.note, '本人の申告'].filter(Boolean).join('・') });
+        });
+      }
+    });
+    return n;
+  }
+  function bindReports() {
+    document.querySelectorAll('[data-srf]').forEach((b) => b.addEventListener('click', () => { srFilter = b.dataset.srf; route(); }));
+    const idOf = (raw) => (isNaN(+raw) ? raw : +raw);
+    document.querySelectorAll('[data-sra]').forEach((b) => b.addEventListener('click', async () => {
+      const r = reports.find((x) => String(x.id) === b.dataset.sra); const p = r && byId(r.staff_id);
+      if (!r || !p) { alert('スタッフが見つかりません。'); return; }
+      const keys = [...document.querySelectorAll(`[data-sr="${CSS.escape(b.dataset.sra)}"]:checked`)].map((c) => c.dataset.key);
+      if (!keys.length) { alert('反映する項目を選んでください。'); return; }
+      b.disabled = true;
+      if (await persist(applyReport(p, r.data || {}, keys))) {
+        try { await Store.setSelfReportStatus(idOf(b.dataset.sra), 'applied'); } catch (e) { alert('名鑑には入りましたが、申告の状態を変えられませんでした: ' + e.message); }
+        reports = await Store.listSelfReports(); updateBadge(); toast('名鑑に反映しました'); route();
+      } else b.disabled = false;
+    }));
+    document.querySelectorAll('[data-srd]').forEach((b) => b.addEventListener('click', async () => {
+      if (!confirm('この申告を見送りますか？（名鑑は変わりません）')) return;
+      try { await Store.setSelfReportStatus(idOf(b.dataset.srd), 'dismissed'); reports = await Store.listSelfReports(); updateBadge(); route(); }
+      catch (e) { alert('更新できませんでした: ' + e.message); }
+    }));
+  }
 
   // ---------- 画面: 個人カルテ ----------
   let profileTab = 'basic';
@@ -508,6 +601,10 @@
             <div class="dots">${[1, 2, 3].map((i) => `<i class="${i <= lv ? 'on' : ''}"></i>`).join('')}</div>
             <span class="lv">${LANG_LV[lv]}</span></div>`; }).join('')}
         </section>
+      </div>
+      <div class="two-col" style="margin-top:16px">
+        <section class="card card-pad"><h2 class="card-title"><span class="mark"></span>今の住まい（地図）</h2>${locMap(p.homeLocation)}</section>
+        <section class="card card-pad"><h2 class="card-title"><span class="mark"></span>実家（村）</h2>${locMap(p.villageLocation)}</section>
       </div>
       <section class="card card-pad" style="margin-top:16px"><h2 class="card-title"><span class="mark"></span>家族</h2>
         ${(p.familyMembers || []).length ? `<div class="fam-list">${p.familyMembers.map((f) => { const fd = daysToBirthday(f.birthday); return `
@@ -675,7 +772,29 @@
     if (!m) return y;
     return d ? `${y}-${pad2(m)}-${pad2(d)}` : `${y}-${pad2(m)}`;
   }
-  const RELATIONS = ['妻', '夫', '息子', '娘', '父', '母', '兄弟姉妹', '祖父母', 'その他'];
+  const RELATIONS = ['妻', '夫', '息子', '娘', '父', '母', '兄', '姉', '弟', '妹', '兄弟姉妹', '祖父母', 'その他'];
+  // 場所（住所がないので Google マップの位置で持つ）: { lat, lng } か { url }
+  function parseLoc(text) {
+    const t = String(text || '').trim(); if (!t) return null;
+    let m = /^(-?\d{1,2}\.\d+)\s*,\s*(-?\d{1,3}\.\d+)$/.exec(t) || /@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/.exec(t) || /[?&]q=(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)/.exec(t) || /!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)/.exec(t);
+    if (m) return { lat: +m[1], lng: +m[2] };
+    return /^https:\/\/(maps\.app\.goo\.gl|goo\.gl\/maps|(www\.)?google\.[a-z.]+\/maps)/.test(t) ? { url: t } : { url: '' };
+  }
+  // 申告などから来た場所を、数値の座標か Google マップのリンクだけに絞る（javascript: などのリンクを入れない）
+  function safeLoc(l) {
+    if (!l) return null;
+    if (l.lat != null && isFinite(+l.lat) && isFinite(+l.lng)) return { lat: +(+l.lat).toFixed(6), lng: +(+l.lng).toFixed(6), acc: isFinite(+l.acc) ? Math.round(+l.acc) : undefined };
+    const r = parseLoc(l.url); return hasLoc(r) ? r : null;
+  }
+  const hasLoc = (l) => !!(l && (l.lat != null || l.url));
+  const locUrl = (l) => (l && l.lat != null ? `https://www.google.com/maps?q=${l.lat},${l.lng}` : (l && l.url) || '');
+  const locInput = (l) => (l && l.lat != null ? `${l.lat},${l.lng}` : (l && l.url) || '');
+  function locMap(l) {
+    if (!hasLoc(l)) return '<p class="empty">未登録</p>';
+    const link = `<a href="${esc(locUrl(l))}" target="_blank" rel="noopener">Google マップで開く</a>`;
+    if (l.lat == null) return `<p>${link}（リンクで登録。地図を出すには、開いた先の座標を貼り直してください）</p>`;
+    return `<iframe class="map" loading="lazy" referrerpolicy="no-referrer" src="https://maps.google.com/maps?q=${l.lat},${l.lng}&z=15&output=embed" title="地図"></iframe><p class="lr-sub">${link}${l.acc ? ` ・ 誤差 約${l.acc}m` : ''}</p>`;
+  }
 
   // 繰り返し行（学歴・資格・研修・プレゼント・メモ）の定義
   const REPEATS = {
@@ -766,6 +885,8 @@
             ${inp('phone', '電話', p.phone, 'tel')}
             ${inp('telegram', 'Telegram', p.telegram)}
             ${inp('address', '住まい（地区まで）', p.address)}
+            <label class="field span3"><span>今の住まいの場所（Google マップのリンク、または「緯度,経度」）</span><input data-loc="homeLocation" value="${esc(locInput(p.homeLocation))}" placeholder="11.5847,104.8991 / https://maps.app.goo.gl/..."></label>
+            <label class="field span3"><span>実家（村）の場所</span><input data-loc="villageLocation" value="${esc(locInput(p.villageLocation))}" placeholder="11.5847,104.8991 / https://maps.app.goo.gl/..."></label>
             ${inp('em.name', '緊急連絡先の名前', p.emergency && p.emergency.name)}
             ${inp('em.relation', '続柄', p.emergency && p.emergency.relation)}
             ${inp('em.phone', '緊急連絡先の電話', p.emergency && p.emergency.phone, 'tel')}
@@ -823,6 +944,8 @@
         else draft[k] = el.value;
       } else if (el.dataset.r) {
         draft[el.dataset.r][+el.dataset.i][el.dataset.c] = el.dataset.part ? bdValue(el.closest('.bd-pick')) : el.value;
+      } else if (el.dataset.loc) {
+        draft[el.dataset.loc] = parseLoc(el.value);
       } else if (el.dataset.lang) {
         draft.languages = draft.languages || {}; draft.languages[el.dataset.lang] = +el.value;
       } else if (el.dataset.skill) {
@@ -861,6 +984,7 @@
       clean.careerAfter = (clean.careerAfter || []).filter((r) => r.role || r.duty);
       clean.dreams = (clean.dreams || []).filter((r) => r.text);
       clean.familyMembers = (clean.familyMembers || []).filter((r) => r.relation || r.name || r.birthday || r.note);
+      ['homeLocation', 'villageLocation'].forEach((k) => { if (clean[k] && !hasLoc(clean[k])) clean[k] = null; });
       // 2月30日のような、ない日付は止める
       const badDate = [clean.birthday, ...clean.familyMembers.map((r) => r.birthday)].find((s) => {
         const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); if (!m) return false;
@@ -970,6 +1094,7 @@
     else if (page === 'edit') { view.innerHTML = viewEdit(id || 'new'); bindEdit(id || 'new'); }
     else if (page === 'birthdays') { view.innerHTML = viewBirthdays(); }
     else if (page === 'leaves') { view.innerHTML = viewLeaves(); bindLeaves(); }
+    else if (page === 'reports') { view.innerHTML = viewReports(); bindReports(); }
     else if (page === 'settings') { view.innerHTML = viewSettings(); bindSettings(); }
     else { view.innerHTML = viewHome(); }
     if (route._last !== h) { window.scrollTo(0, 0); route._last = h; }

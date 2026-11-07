@@ -124,6 +124,38 @@
       if (!data || !data.length) fail('更新できませんでした（状態が変わっている可能性があります。画面を読み込み直してください）');
     },
 
+    // ---------- 自己申告（本人が「自分のこと」を送る → 日本メンバーが確認して名鑑へ反映） ----------
+    async listSelfReports(staffId) {
+      if (!cloud) {
+        const all = lsGet('smStaff.self.v1', []);
+        return (staffId ? all.filter((r) => r.staff_id === staffId) : all).sort((a, b) => b.created_at.localeCompare(a.created_at));
+      }
+      let q = sb.from('self_reports').select('*').order('created_at', { ascending: false });
+      if (staffId) q = q.eq('staff_id', staffId);
+      const { data, error } = await q;
+      if (error) fail(error);
+      return data || [];
+    },
+    async createSelfReport(staffId, data) {
+      if (!cloud) {
+        const all = lsGet('smStaff.self.v1', []);
+        all.push({ id: Date.now(), staff_id: staffId, data, status: 'pending', created_at: new Date().toISOString() });
+        lsSet('smStaff.self.v1', all); return;
+      }
+      const { error } = await sb.from('self_reports').insert({ staff_id: staffId, data });
+      if (error) fail(error);
+    },
+    async setSelfReportStatus(id, status) {
+      if (!cloud) {
+        const all = lsGet('smStaff.self.v1', []); const r = all.find((x) => x.id === id);
+        if (r) { r.status = status; r.reviewed_at = new Date().toISOString(); }
+        lsSet('smStaff.self.v1', all); return;
+      }
+      const { data, error } = await sb.from('self_reports').update({ status }).eq('id', id).select('id');
+      if (error) fail(error);
+      if (!data || !data.length) fail('更新できませんでした');
+    },
+
     // ---------- 勤怠（本体シートの写し） ----------
     async attendance(staffId, fromYMD) {
       if (!cloud) return null; // デモは画面側で仮の数字を作る
