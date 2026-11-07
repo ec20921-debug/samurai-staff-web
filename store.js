@@ -156,6 +156,14 @@
       if (!data || !data.length) fail('更新できませんでした');
     },
 
+    // ---------- 給与の照合結果（毎日 23 時に GAS が書く。管理者だけ読める） ----------
+    async listSalaryChecks() {
+      if (!cloud) return [];
+      const { data, error } = await sb.from('salary_checks').select('*');
+      if (error) fail(error);
+      return data || [];
+    },
+
     // ---------- 勤怠（本体シートの写し） ----------
     async attendance(staffId, fromYMD) {
       if (!cloud) return null; // デモは画面側で仮の数字を作る

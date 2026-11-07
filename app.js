@@ -55,6 +55,14 @@
     if (next < t) next = new Date(t.getFullYear() + 1, b.getMonth(), b.getDate());
     return Math.round((next - t) / 86400000);
   }
+  // 給与の照合結果（毎日 23 時）。経費（ルーティン経費）と食い違えば ⚠️、合っていれば小さく ✓
+  function salaryCheckNote(p) {
+    const c = (salaryChecks || []).find((x) => x.staff_id === p.id);
+    if (!c) return '';
+    const when = String(c.checked_at || '').slice(0, 10);
+    if (!c.ok) return `<div class="sal-warn">⚠️ ${esc(c.message)}（${esc(when)} の照合）<br><span>経費の設定は本体シートの「ルーティン経費」で直してください。名鑑の月給が正です。</span></div>`;
+    return `<div class="sal-ok">✓ 経費（${esc(c.routine_id || '')}）・スタッフマスターと一致（${esc(when)}）${c.message ? ' ・ ' + esc(c.message) : ''}</div>`;
+  }
   // 年齢の表示（年だけ分かっているときは「約」をつける）
   function ageText(bd) {
     if (/^\d{4}$/.test(bd || '')) return `約${todayYMD().getFullYear() - +bd}歳`;
@@ -118,10 +126,12 @@
   // AI は人が増えてから入れる（2026-11-07 Daisuke）。本番では config.js の aiEnabled: true で出す。デモでは見た目を確かめられるよう出す
   const AI_ON = !CLOUD || !!(window.STAFF_APP_CONFIG || {}).aiEnabled;
   let reports = []; // 自己申告（管理者は全員分）
+  let salaryChecks = []; // 給与の照合結果（名鑑＝正 と ルーティン経費・スタッフマスター）
   async function load() {
     staff = await Store.loadStaff();
     try { leaves = await Store.listLeave(); } catch (e) { leaves = []; }
     try { reports = await Store.listSelfReports(); } catch (e) { reports = []; }
+    try { salaryChecks = await Store.listSalaryChecks(); } catch (e) { salaryChecks = []; }
   }
   // 1人分を保存（本番は1行 upsert、デモは全員分を localStorage へ）
   // 保存に成功してから画面のデータを入れ替える（失敗したら何も変えない）
@@ -587,7 +597,7 @@
             <dt>状態</dt><dd>${statusBadge(p.status)}</dd>
             <dt>入社日</dt><dd>${fmtDate(p.joinDate)}（勤続 ${tenure(p.joinDate)}）</dd>
             <dt>できる作業</dt><dd>${(p.skills || []).map((s) => `<span class="chip chip-gold">${esc(s)}</span>`).join('') || '—'}</dd>
-            <dt>給与（月）</dt><dd>${p.salary ? `<b>${esc(p.salary)}$</b>` : '—'}${(p.salaryHistory || []).length ? `<div class="lr-sub">${[...p.salaryHistory].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((h) => `${esc(h.date ? fmtDate(h.date) : '—')}〜 ${esc(h.amount)}$${h.note ? '（' + esc(h.note) + '）' : ''}`).join('<br>')}</div>` : ''}</dd>
+            <dt>給与（月）</dt><dd>${salaryCheckNote(p)}${p.salary ? `<b>${esc(p.salary)}$</b>` : '—'}${(p.salaryHistory || []).length ? `<div class="lr-sub">${[...p.salaryHistory].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((h) => `${esc(h.date ? fmtDate(h.date) : '—')}〜 ${esc(h.amount)}$${h.note ? '（' + esc(h.note) + '）' : ''}`).join('<br>')}</div>` : ''}</dd>
           </dl></section>
         <section class="card card-pad"><h2 class="card-title"><span class="mark"></span>連絡先</h2>
           <dl class="kv">

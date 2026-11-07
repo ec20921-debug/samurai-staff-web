@@ -331,6 +331,10 @@ dl.kv dt:first-of-type,dl.kv dd:first-of-type{border-top:0;}
 .s-loc{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 12px;background:var(--surface-2);}
 .s-loc-t{display:block;font-size:12.5px;color:var(--ink-2);margin-bottom:6px;font-weight:700;}
 .s-loc-ok{font-size:13px;color:var(--ok);margin:0 0 8px;}
+/* 給与の照合 */
+.sal-warn{background:var(--warn-soft);color:var(--warn);border-radius:8px;padding:6px 8px;font-size:12.5px;margin-bottom:6px;}
+.sal-warn span{color:var(--ink-2);font-size:11.5px;}
+.sal-ok{color:var(--ok);font-size:11.5px;margin-bottom:4px;}
 /* 地図 */
 iframe.map{width:100%;height:220px;border:0;border-radius:10px;background:var(--muted-soft);}
 
