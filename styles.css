@@ -215,6 +215,7 @@ dl.kv dt:first-of-type,dl.kv dd:first-of-type{border-top:0;}
 .re-career{grid-template-columns:140px 1fr 1fr 28px;}
 .re-dream{grid-template-columns:150px 1fr 28px;}
 .re-family{grid-template-columns:120px 1fr 280px 1fr 28px;}
+.re-salary{grid-template-columns:160px 120px 1fr 28px;}
 /* 生年月日の年・月・日 */
 .bd-pick{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:6px;}
 .bd-pick select{border:1px solid var(--line-2);border-radius:8px;padding:8px 6px;background:var(--surface);width:100%;}
@@ -378,7 +379,7 @@ iframe.map{width:100%;height:220px;border:0;border-radius:10px;background:var(--
   .form-grid{grid-template-columns:1fr;}
   .form-grid .span2,.form-grid .span3{grid-column:auto;}
   .months{grid-template-columns:1fr 1fr;}
-  .re-edu,.re-qual,.re-train,.re-gift,.re-note,.re-career,.re-dream,.re-family{grid-template-columns:1fr 28px;}
+  .re-edu,.re-qual,.re-train,.re-gift,.re-note,.re-career,.re-dream,.re-family,.re-salary{grid-template-columns:1fr 28px;}
   .row-head{display:none;}
   dl.kv{grid-template-columns:100px 1fr;}
 }

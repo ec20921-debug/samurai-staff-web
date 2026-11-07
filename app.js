@@ -587,6 +587,7 @@
             <dt>状態</dt><dd>${statusBadge(p.status)}</dd>
             <dt>入社日</dt><dd>${fmtDate(p.joinDate)}（勤続 ${tenure(p.joinDate)}）</dd>
             <dt>できる作業</dt><dd>${(p.skills || []).map((s) => `<span class="chip chip-gold">${esc(s)}</span>`).join('') || '—'}</dd>
+            <dt>給与（月）</dt><dd>${p.salary ? `<b>${esc(p.salary)}$</b>` : '—'}${(p.salaryHistory || []).length ? `<div class="lr-sub">${[...p.salaryHistory].sort((a, b) => (b.date || '').localeCompare(a.date || '')).map((h) => `${esc(h.date ? fmtDate(h.date) : '—')}〜 ${esc(h.amount)}$${h.note ? '（' + esc(h.note) + '）' : ''}`).join('<br>')}</div>` : ''}</dd>
           </dl></section>
         <section class="card card-pad"><h2 class="card-title"><span class="mark"></span>連絡先</h2>
           <dl class="kv">
@@ -750,7 +751,7 @@
     careerBefore: [], careerAfter: [], dreams: [],
     address: '', phone: '', telegram: '', joinDate: '', role: 'スタッフ', employment: '試用期間', status: '在籍',
     skills: [], languages: { km: 3, en: 0, ja: 0 }, education: [], qualifications: [], trainings: [],
-    family: '', emergency: { name: '', relation: '', phone: '' }, likes: '', gifts: [], notes: []
+    family: '', emergency: { name: '', relation: '', phone: '' }, likes: '', gifts: [], notes: [], salary: '', salaryHistory: []
   });
 
   const opts = (list, val, empty) => (empty ? `<option value="">${empty}</option>` : '') + list.map((o) => `<option ${o === val ? 'selected' : ''}>${esc(o)}</option>`).join('');
@@ -805,6 +806,7 @@
     careerBefore: { cls: 're-career', head: ['期間', '勤め先・仕事', 'していたこと'], cols: [['period', 'text', '2020–2024'], ['company', 'text', '例: ガソリンスタンド'], ['duty', 'text', '例: 給油・洗車']], blank: { period: '', company: '', duty: '' } },
     careerAfter: { cls: 're-career', head: ['いつから', '役割・担当', 'したこと・成果'], cols: [['date', 'month', ''], ['role', 'text', '例: WASH 担当'], ['duty', 'text', '例: 月80台を担当']], blank: { date: '', role: '', duty: '' } },
     dreams: { cls: 're-dream', head: ['聞いた日', '夢・これからどうしたいか'], cols: [['date', 'date', ''], ['text', 'text', '例: 3年後に班長になって家族に家を建てたい']], blank: { date: '', text: '' } },
+    salaryHistory: { cls: 're-salary', head: ['いつから', '月給（$）', 'メモ（昇給・入社時など）'], cols: [['date', 'month', ''], ['amount', 'number', '500'], ['note', 'text', '例: 昇給']], blank: { date: '', amount: '', note: '' } },
     gifts: { cls: 're-gift', head: ['年', '贈ったもの'], cols: [['year', 'text', '2026'], ['item', 'text', '']], blank: { year: String(new Date().getFullYear()), item: '' } },
     notes: { cls: 're-note', head: ['日付', '書いた人', 'メモ'], cols: [['date', 'date', ''], ['by', 'text', ''], ['text', 'text', '']], blank: { date: '', by: '', text: '' } }
   };
@@ -871,7 +873,9 @@
             <label class="field"><span>雇用形態</span><select data-k="employment">${opts(EMPLOYMENTS, p.employment)}</select></label>
             <label class="field"><span>状態</span><select data-k="status">${opts(STATUSES, p.status)}</select></label>
             ${inp('joinDate', '入社日', p.joinDate, 'date')}
+            ${inp('salary', '月給（$）', p.salary, 'number')}
           </div>
+          <div class="field"><span>給与の記録（昇給したら行を足す）</span>${repeatBlock('salaryHistory')}</div>
           <div class="field"><span>できる作業</span><div class="checks">
             ${SKILLS.map((s) => `<label><input type="checkbox" data-skill="${esc(s)}" ${(p.skills || []).includes(s) ? 'checked' : ''}>${esc(s)}</label>`).join('')}
           </div></div>
@@ -980,6 +984,7 @@
       clean.qualifications = (clean.qualifications || []).filter((r) => r.name);
       clean.trainings = (clean.trainings || []).filter((r) => r.title);
       clean.gifts = (clean.gifts || []).filter((r) => r.item);
+      clean.salaryHistory = (clean.salaryHistory || []).filter((r) => r.amount);
       clean.careerBefore = (clean.careerBefore || []).filter((r) => r.company || r.duty);
       clean.careerAfter = (clean.careerAfter || []).filter((r) => r.role || r.duty);
       clean.dreams = (clean.dreams || []).filter((r) => r.text);
