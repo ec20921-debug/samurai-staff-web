@@ -156,6 +156,24 @@
       if (!data || !data.length) fail('更新できませんでした');
     },
 
+    // ---------- 使った記録（ログインと、開いたとき）2026-11-18 ----------
+    // 記録に失敗しても画面は止めない（表がまだ無い・電波が弱いなど）
+    async logAccess(event, device) {
+      if (!cloud) return;
+      try {
+        const { error } = await sb.from('access_log').insert({ event, device: String(device || '').slice(0, 120) });
+        if (error) console.warn('使った記録を残せませんでした', error.message);
+      } catch (e) { console.warn('使った記録を残せませんでした', e && e.message); }
+    },
+    // 管理者だけ読める（RLS）。新しい順に最大 limit 件
+    async listAccessLog(limit) {
+      if (!cloud) return [];
+      const { data, error } = await sb.from('access_log').select('login_id, staff_id, event, device, created_at')
+        .order('created_at', { ascending: false }).limit(limit || 300);
+      if (error) fail(error);
+      return data || [];
+    },
+
     // ---------- 給与の照合結果（毎日 23 時に GAS が書く。管理者だけ読める） ----------
     async listSalaryChecks() {
       if (!cloud) return [];

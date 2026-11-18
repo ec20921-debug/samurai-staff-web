@@ -1097,6 +1097,47 @@
     });
   }
 
+  // ---------- 使った記録（ログインと、開いたとき）2026-11-18 ----------
+  // 端末のだいたいの種類（機種名までは分からない）。ホーム画面アプリかブラウザかも添える
+  function deviceLabel() {
+    const ua = navigator.userAgent || '';
+    const os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android'
+      : /Macintosh/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'その他';
+    const app = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone ? 'ホーム画面アプリ' : 'ブラウザ';
+    return `${os}・${app}`;
+  }
+  function logAccess(event) { Store.logAccess(event, deviceLabel()); }
+  // 30分以上閉じていて（裏に回していて）戻ってきたときも「開いた」と記録する
+  let hiddenAt = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return; }
+    if (ME && hiddenAt && Date.now() - hiddenAt >= 30 * 60 * 1000) logAccess('open');
+    hiddenAt = 0;
+  });
+
+  let accessRows = null; // 管理者の「使った記録」画面で読んだもの
+  const fmtTZ = (iso, tz) => new Intl.DateTimeFormat('ja-JP', { timeZone: tz, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
+  function viewAccess() {
+    if (!CLOUD) return `<div class="page-head"><div><h1 class="page-title">使った記録</h1></div></div><p class="empty">デモでは記録しません。</p>`;
+    if (accessRows === null) return `<div class="page-head"><div><h1 class="page-title">使った記録</h1></div></div><p class="empty">読み込み中…</p>`;
+    if (accessRows === 'error') return `<div class="page-head"><div><h1 class="page-title">使った記録</h1></div></div><p class="empty">記録を読めませんでした。通信を確かめて、もう一度このページを開いてください（表の用意がまだの可能性もあります）。</p>`;
+    const names = new Map(staff.map((p) => [p.id, p.nickname || p.nameEn || p.id]));
+    const who = (r) => esc(names.get(r.staff_id) || r.login_id || '（不明）');
+    const ev = (e) => e === 'login' ? '<span class="badge badge-ok">ログイン</span>' : '<span class="badge">開いた</span>';
+    return `
+      <div class="page-head"><div><h1 class="page-title">使った記録</h1>
+        <p class="page-sub">ログインしたときと、名鑑を開いたとき（30分以上閉じていて開き直したときも）の記録です。新しい順に最大300件。記録は画面から直すことも消すこともできません。</p></div></div>
+      ${accessRows.length ? `<div class="card table-wrap"><table class="tbl"><thead><tr><th>日本時間</th><th>プノンペン</th><th>だれ</th><th>何を</th><th>端末</th></tr></thead><tbody>
+        ${accessRows.map((r) => `<tr><td class="num">${esc(fmtTZ(r.created_at, 'Asia/Tokyo'))}</td><td class="num">${esc(fmtTZ(r.created_at, 'Asia/Phnom_Penh'))}</td><td>${who(r)}</td><td>${ev(r.event)}</td><td>${esc(r.device)}</td></tr>`).join('')}
+      </tbody></table></div>` : '<p class="empty">まだ記録はありません。</p>'}`;
+  }
+  async function bindAccess() {
+    if (!CLOUD || accessRows !== null) return;
+    try { accessRows = await Store.listAccessLog(300); }
+    catch (e) { accessRows = 'error'; }
+    if ((location.hash.replace(/^#\/?/, '') || 'home') === 'access') route();
+  }
+
   // ---------- ルーター ----------
   function route() {
     const h = location.hash.replace(/^#\/?/, '') || 'home';
@@ -1111,6 +1152,7 @@
     else if (page === 'leaves') { view.innerHTML = viewLeaves(); bindLeaves(); }
     else if (page === 'reports') { view.innerHTML = viewReports(); bindReports(); }
     else if (page === 'settings') { view.innerHTML = viewSettings(); bindSettings(); }
+    else if (page === 'access') { if (route._last !== h) accessRows = null; view.innerHTML = viewAccess(); bindAccess(); }
     else { view.innerHTML = viewHome(); }
     if (route._last !== h) { window.scrollTo(0, 0); route._last = h; }
   }
@@ -1123,8 +1165,9 @@
 
   // ---------- ログインと画面の振り分け ----------
   // 管理者（日本メンバー）→ 名鑑の画面／現場スタッフ → 休暇申請だけの画面
-  async function enter(me) {
+  async function enter(me, event) {
     ME = me;
+    if (event) logAccess(event); // 'login'＝ID とパスワードで入った／'open'＝ログインしたまま開いた
     $('#login').hidden = true;
     if (me.role === 'staff') {
       $('#app').hidden = true; $('#staffApp').hidden = false;
@@ -1151,7 +1194,7 @@
   $('#loginForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     const err = $('#loginErr'); err.hidden = true;
-    try { await enter(await Store.signIn($('#loginId').value, $('#loginPw').value)); }
+    try { await enter(await Store.signIn($('#loginId').value, $('#loginPw').value), 'login'); }
     catch (x) { err.textContent = x.code === 'BAD_LOGIN' ? StaffScreen.loginFailedText() : (x.message || StaffScreen.loginFailedText()); err.hidden = false; }
   });
   document.querySelectorAll('[data-demo]').forEach((b) => b.addEventListener('click', async () => enter(await Store.demoSignIn(b.dataset.demo))));
@@ -1161,6 +1204,6 @@
     let me = null;
     try { me = await Store.currentUser(); } catch (e) { me = null; }
     if (Store.configError) { document.body.innerHTML = `<div class="login"><div class="login-card"><p class="login-err">${esc(Store.configError)}</p></div></div>`; return; }
-    if (me) { try { await enter(me); } catch (e) { showLogin(); } } else showLogin();
+    if (me) { try { await enter(me, 'open'); } catch (e) { showLogin(); } } else showLogin();
   })();
 })();
