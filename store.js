@@ -28,6 +28,13 @@
   const DEMO_STAFF_ME = { role: 'staff', displayName: 'Vanna（デモ）', staffId: 's2', loginId: 'demo-staff' };
   const DEMO_ADMIN_ME = { role: 'admin', displayName: '日本メンバー（デモ）', staffId: null, loginId: 'demo-admin' };
 
+  // デモ用: 入口のタイル（行き先は名鑑の中の画面だけ）
+  const DEMO_PORTAL = [
+    { section: '名鑑', title: '名鑑ホーム', note: '誕生日・新しい人', url: '#/home', icon: '◆' },
+    { section: '名鑑', title: 'スタッフ一覧', note: '', url: '#/staff', icon: '◉' },
+    { section: '名鑑', title: '休暇申請', note: '承認する', url: '#/leaves', icon: '✉' },
+  ];
+
   const Store = {
     mode: cloud ? 'cloud' : 'demo',
     configError,
@@ -170,6 +177,14 @@
       if (!cloud) return [];
       const { data, error } = await sb.from('access_log').select('login_id, staff_id, event, device, created_at')
         .order('created_at', { ascending: false }).limit(limit || 300);
+      if (error) fail(error);
+      return data || [];
+    },
+
+    // ---------- 入口（ポータル）のリンク。自分の役割に出してよいものだけが届く（RLS）2026-11-21 ----------
+    async listPortalLinks() {
+      if (!cloud) return clone(DEMO_PORTAL);
+      const { data, error } = await sb.from('portal_links').select('section, title, note, url, icon').order('sort').order('id');
       if (error) fail(error);
       return data || [];
     },

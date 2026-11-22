@@ -387,3 +387,17 @@ iframe.map{width:100%;height:220px;border:0;border-radius:10px;background:var(--
   .row-head{display:none;}
   dl.kv{grid-template-columns:100px 1fr;}
 }
+
+/* ---------- 入口（ポータル）2026-11-21 ---------- */
+.portal-sec{margin:22px 0 10px;font-size:14px;color:var(--ink-2);letter-spacing:.06em;display:flex;align-items:center;gap:8px;}
+.portal-sec::before{content:"";width:4px;height:15px;border-radius:2px;background:var(--accent);}
+.portal-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px;}
+.portal-tile{display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);text-decoration:none;color:var(--ink);min-height:68px;}
+.portal-tile:hover{border-color:var(--accent);background:var(--surface-2);}
+.portal-ico{flex:0 0 40px;height:40px;border-radius:10px;background:var(--accent-soft);display:flex;align-items:center;justify-content:center;font-size:20px;}
+.portal-txt{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.35;}
+.portal-txt b{font-size:14px;}
+.portal-txt small{color:var(--ink-3);font-size:12px;}
+.portal-out{color:var(--ink-3);font-size:13px;}
+/* 経営・メンバー: 入口だけ（名鑑のメニューは出さない） */
+body.portal-only .nav a:not([data-nav="portal"]),body.portal-only .biz{display:none;}

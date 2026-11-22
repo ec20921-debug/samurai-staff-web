@@ -1115,6 +1115,38 @@
     hiddenAt = 0;
   });
 
+  // ---------- 入口（ポータル）2026-11-21: 役割ごとに、見てよい画面とシートへのタイルを並べる ----------
+  // リンクは Supabase の portal_links から読む（役割に合うものだけが届く）。画面のファイルには行き先を書かない
+  let portalRows = null;
+  const ROLE_LABEL = { admin: '全部', exec: '経営', member: 'メンバー' };
+  const safeUrl = (u) => (/^https:\/\//.test(u) || /^#\//.test(u)) ? u : '#/portal';
+  function viewPortal() {
+    const head = `<div class="page-head"><div><h1 class="page-title">入口</h1><p class="page-sub">Samurai Motors ・ ${esc(ME ? ME.displayName : '')}（${esc(ROLE_LABEL[ME && ME.role] || '')}）</p></div></div>`;
+    if (portalRows === null) return head + '<p class="empty">読み込み中…</p>';
+    if (portalRows === 'error') return head + '<p class="empty">入口を読めませんでした。通信を確かめて、もう一度開いてください。</p>';
+    if (!portalRows.length) return head + '<p class="empty">まだ何も登録されていません。</p>';
+    const sections = [];
+    portalRows.forEach((r) => { let s = sections.find((x) => x.name === r.section); if (!s) sections.push(s = { name: r.section, rows: [] }); s.rows.push(r); });
+    return head + sections.map((s) => `
+      <h2 class="portal-sec">${esc(s.name)}</h2>
+      <div class="portal-grid">${s.rows.map((r) => { const u = safeUrl(String(r.url || '')); const out = u.startsWith('https://'); return `
+        <a class="portal-tile" href="${esc(u)}"${out ? ' target="_blank" rel="noopener noreferrer"' : ''}>
+          <span class="portal-ico">${esc(r.icon || '•')}</span>
+          <span class="portal-txt"><b>${esc(r.title)}</b>${r.note ? `<small>${esc(r.note)}</small>` : ''}</span>
+          ${out ? '<span class="portal-out">↗</span>' : ''}
+        </a>`; }).join('')}
+      </div>`).join('');
+  }
+  async function bindPortal() {
+    if (portalRows !== null) return;
+    const who = ME; let rows;
+    try { rows = await Store.listPortalLinks(); }
+    catch (e) { rows = 'error'; }
+    if (ME !== who || !ME) return; // 読んでいる間にログアウト・入り直しがあったら捨てる
+    portalRows = rows;
+    if ((location.hash.replace(/^#\/?/, '') || 'portal').split('/')[0] === 'portal' || (ME && ME.role !== 'admin')) route();
+  }
+
   let accessRows = null; // 管理者の「使った記録」画面で読んだもの
   const fmtTZ = (iso, tz) => new Intl.DateTimeFormat('ja-JP', { timeZone: tz, month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(iso));
   function viewAccess() {
@@ -1140,7 +1172,8 @@
 
   // ---------- ルーター ----------
   function route() {
-    const h = location.hash.replace(/^#\/?/, '') || 'home';
+    // 経営・メンバーは入口だけ（名鑑の画面には入れない。データも RLS で読めない）
+    const h = (ME && ME.role !== 'admin') ? 'portal' : (location.hash.replace(/^#\/?/, '') || 'portal');
     const [page, id] = h.split('/');
     if (page !== 'edit') draft = null;
     const view = $('#view');
@@ -1152,6 +1185,7 @@
     else if (page === 'leaves') { view.innerHTML = viewLeaves(); bindLeaves(); }
     else if (page === 'reports') { view.innerHTML = viewReports(); bindReports(); }
     else if (page === 'settings') { view.innerHTML = viewSettings(); bindSettings(); }
+    else if (page === 'portal') { if (portalRows === 'error' && route._last !== h) portalRows = null; view.innerHTML = viewPortal(); bindPortal(); }
     else if (page === 'access') { if (route._last !== h) accessRows = null; view.innerHTML = viewAccess(); bindAccess(); }
     else { view.innerHTML = viewHome(); }
     if (route._last !== h) { window.scrollTo(0, 0); route._last = h; }
@@ -1175,12 +1209,15 @@
       return;
     }
     $('#staffApp').hidden = true;
-    try { await load(); } catch (e) { alert('データを読めませんでした: ' + e.message); }
+    const portalOnly = me.role !== 'admin'; // 経営・メンバー: 入口だけ
+    document.body.classList.toggle('portal-only', portalOnly);
+    portalRows = null;
+    if (!portalOnly) { try { await load(); } catch (e) { alert('データを読めませんでした: ' + e.message); } }
     $('#whoami').textContent = me.displayName;
-    $('#app').hidden = false; updateBadge(); route();
+    $('#app').hidden = false; if (!portalOnly) updateBadge(); route();
   }
   async function signOut() {
-    await Store.signOut(); ME = null; staff = []; leaves = []; draft = null;
+    await Store.signOut(); ME = null; staff = []; leaves = []; draft = null; portalRows = null; document.body.classList.remove('portal-only');
     // 共用のパソコンで他人のデータが画面の裏に残らないよう、描いたものを消す
     $('#view').innerHTML = ''; $('#staffApp').innerHTML = ''; $('#loginPw').value = '';
     $('#app').hidden = true; $('#staffApp').hidden = true; showLogin();
