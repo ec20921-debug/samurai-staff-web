@@ -1118,11 +1118,32 @@
   // ---------- 入口（ポータル）2026-11-21: 役割ごとに、見てよい画面とシートへのタイルを並べる ----------
   // リンクは Supabase の portal_links から読む（役割に合うものだけが届く）。画面のファイルには行き先を書かない
   let portalRows = null;
+  let portalToday = null, portalTodayAt = 0; // 今日の数字: null＝まだ／'none'＝出さない（デモ・読めない）／読めたもの
+  function viewPortalToday() {
+    if (!CLOUD || portalToday === 'none') return '';
+    if (portalToday === null) return '<p class="portal-today-wait">今日の数字を読み込み中…</p>';
+    const t = portalToday;
+    return `<h2 class="portal-sec">今日（プノンペン ${esc(String(t.date || ''))}・${esc(String(t.at || ''))} 時点）</h2>
+      <div class="today-grid">${t.cards.map((c) => `
+        <div class="today-card"><div class="today-head"><span>${esc(c.icon || '')}</span><b>${esc(c.title || '')}</b></div>
+          ${(c.lines || []).slice(0, 12).map((l) => `<div class="today-line">${esc(l)}</div>`).join('')}</div>`).join('')}
+      </div>`;
+  }
+  async function loadPortalToday() {
+    if (!CLOUD || (portalTodayAt && Date.now() - portalTodayAt < 180000)) return; // 3分に1回まで
+    portalTodayAt = Date.now();
+    const who = ME; let t;
+    try { t = await Store.portalToday(); } catch (e) { t = null; }
+    if (ME !== who || !ME) return;
+    portalToday = t || (portalToday && portalToday !== 'none' ? portalToday : 'none'); // 読めなかった時は前の表示を残す
+    if ((location.hash.replace(/^#\/?/, '') || 'portal').split('/')[0] === 'portal' || ME.role !== 'admin') route();
+  }
   const ROLE_LABEL = { admin: '全部', exec: '経営', member: 'メンバー' };
   const safeUrl = (u) => (/^https:\/\//.test(u) || /^#\//.test(u)) ? u : '#/portal';
   function viewPortal() {
-    const head = `<div class="page-head"><div><h1 class="page-title">入口</h1><p class="page-sub">Samurai Motors ・ ${esc(ME ? ME.displayName : '')}（${esc(ROLE_LABEL[ME && ME.role] || '')}）</p></div></div>`;
+    let head = `<div class="page-head"><div><h1 class="page-title">入口</h1><p class="page-sub">Samurai Motors ・ ${esc(ME ? ME.displayName : '')}（${esc(ROLE_LABEL[ME && ME.role] || '')}）</p></div></div>`;
     if (portalRows === null) return head + '<p class="empty">読み込み中…</p>';
+    head += viewPortalToday();
     if (portalRows === 'error') return head + '<p class="empty">入口を読めませんでした。通信を確かめて、もう一度開いてください。</p>';
     if (!portalRows.length) return head + '<p class="empty">まだ何も登録されていません。</p>';
     const sections = [];
@@ -1185,7 +1206,7 @@
     else if (page === 'leaves') { view.innerHTML = viewLeaves(); bindLeaves(); }
     else if (page === 'reports') { view.innerHTML = viewReports(); bindReports(); }
     else if (page === 'settings') { view.innerHTML = viewSettings(); bindSettings(); }
-    else if (page === 'portal') { if (portalRows === 'error' && route._last !== h) portalRows = null; view.innerHTML = viewPortal(); bindPortal(); }
+    else if (page === 'portal') { if (portalRows === 'error' && route._last !== h) portalRows = null; view.innerHTML = viewPortal(); bindPortal(); loadPortalToday(); }
     else if (page === 'access') { if (route._last !== h) accessRows = null; view.innerHTML = viewAccess(); bindAccess(); }
     else { view.innerHTML = viewHome(); }
     if (route._last !== h) { window.scrollTo(0, 0); route._last = h; }
@@ -1211,13 +1232,13 @@
     $('#staffApp').hidden = true;
     const portalOnly = me.role !== 'admin'; // 経営・メンバー: 入口だけ
     document.body.classList.toggle('portal-only', portalOnly);
-    portalRows = null;
+    portalRows = null; portalToday = null; portalTodayAt = 0;
     if (!portalOnly) { try { await load(); } catch (e) { alert('データを読めませんでした: ' + e.message); } }
     $('#whoami').textContent = me.displayName;
     $('#app').hidden = false; if (!portalOnly) updateBadge(); route();
   }
   async function signOut() {
-    await Store.signOut(); ME = null; staff = []; leaves = []; draft = null; portalRows = null; document.body.classList.remove('portal-only');
+    await Store.signOut(); ME = null; staff = []; leaves = []; draft = null; portalRows = null; portalToday = null; portalTodayAt = 0; document.body.classList.remove('portal-only');
     // 共用のパソコンで他人のデータが画面の裏に残らないよう、描いたものを消す
     $('#view').innerHTML = ''; $('#staffApp').innerHTML = ''; $('#loginPw').value = '';
     $('#app').hidden = true; $('#staffApp').hidden = true; showLogin();

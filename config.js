@@ -8,5 +8,7 @@ window.STAFF_APP_CONFIG = {
   supabaseUrl: 'https://vavtrzewmldmpwmtogef.supabase.co',
   supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhdnRyemV3bWxkbXB3bXRvZ2VmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTM5OTQzNDIsImV4cCI6MjEwOTU3MDM0Mn0.POmvZh5wF39IXwXlWo2earco88UsZ0kbBKg00IuerWg',
   aiEnabled: false, // AI（要約・言葉で探す・プレゼント案）。人が増えて AI の鍵を入れたら true にする
+  // 入口の「今日」を返す窓口（v7-operations の Web アプリ・現場アプリと同じ公開の宛先。鍵ではない）
+  opsUrl: 'https://script.google.com/macros/s/AKfycbxHLCD6vhnNZhSywyWmpaUuwt1goC4n9pwLNNlVzo-3gp9eSwAIMU_EXWPVdbt9Vw/exec',
   emailDomain: 'staff.samurai-motors.invalid' // ログインIDの裏で使うだけのメール形式（実在しない宛先）
 };

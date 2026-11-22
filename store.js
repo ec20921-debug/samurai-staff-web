@@ -189,6 +189,20 @@
       return data || [];
     },
 
+    // ---------- 入口の「今日」（売上・出勤・そうじ・日本語）2026-11-22 ----------
+    // v7-operations（GAS）に、ログイン中の通行証を付けて聞く。GAS 側が Supabase に役割を確かめ、役割に合う分だけ返す。
+    // 通行証は1時間で切れる。送る先は自社の窓口（config.js の opsUrl）だけ
+    async portalToday() {
+      if (!cloud || !cfg.opsUrl) return null;
+      const { data } = await sb.auth.getSession();
+      if (!data || !data.session) return null;
+      const res = await fetch(cfg.opsUrl, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify({ action: 'portal_today', token: data.session.access_token, apikey: cfg.supabaseAnonKey }) });
+      const j = await res.json();
+      if (!j || !j.ok || !Array.isArray(j.cards)) fail((j && j.error) || '読めませんでした');
+      return j;
+    },
+
     // ---------- 給与の照合結果（毎日 23 時に GAS が書く。管理者だけ読める） ----------
     async listSalaryChecks() {
       if (!cloud) return [];

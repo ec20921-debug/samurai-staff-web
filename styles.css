@@ -401,3 +401,11 @@ iframe.map{width:100%;height:220px;border:0;border-radius:10px;background:var(--
 .portal-out{color:var(--ink-3);font-size:13px;}
 /* 経営・メンバー: 入口だけ（名鑑のメニューは出さない） */
 body.portal-only .nav a:not([data-nav="portal"]),body.portal-only .biz{display:none;}
+
+/* ---------- 入口の「今日」2026-11-22 ---------- */
+.portal-today-wait{color:var(--ink-3);font-size:13px;margin:0 0 6px;}
+.today-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;}
+.today-card{background:var(--surface);border:1px solid var(--line-2);border-radius:var(--r);box-shadow:var(--shadow);padding:14px 16px;}
+.today-head{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:15px;}
+.today-line{font-size:13px;color:var(--ink-2);line-height:1.6;overflow-wrap:anywhere;}
+.today-card .today-line:first-of-type{color:var(--ink);font-weight:700;font-size:14px;}
